@@ -1,53 +1,234 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mrtechnician | Quest Control</title>
-    <link rel="stylesheet" href="style.css">
+<meta charset="UTF-8">
+<title>Habit Tracker Pro</title>
+
+<style>
+body{
+  margin:0;
+  font-family:Arial;
+  background:#0f172a;
+  color:white;
+}
+
+header{
+  padding:15px;
+  text-align:center;
+  font-size:22px;
+  font-weight:bold;
+  background:#1e293b;
+}
+
+.container{
+  padding:15px;
+}
+
+input, button{
+  padding:10px;
+  border:none;
+  border-radius:8px;
+  margin:5px;
+}
+
+input{
+  width:60%;
+}
+
+button{
+  background:#22c55e;
+  color:white;
+  cursor:pointer;
+}
+
+.grid{
+  margin-top:20px;
+  overflow-x:auto;
+}
+
+table{
+  border-collapse:collapse;
+  width:100%;
+}
+
+th, td{
+  border:1px solid #334155;
+  padding:6px;
+  text-align:center;
+}
+
+th{
+  background:#1e293b;
+}
+
+.habit-name{
+  text-align:left;
+  padding-left:10px;
+}
+
+.checkbox{
+  width:18px;
+  height:18px;
+}
+
+.progress{
+  margin-top:20px;
+  font-size:18px;
+}
+
+.streak{
+  margin-top:10px;
+  font-size:16px;
+  color:#22c55e;
+}
+</style>
+
 </head>
 <body>
-    <div class="container">
-        <header>
-            <div class="brand">
-                <h1>MRTECHNICIAN</h1>
-                <p id="current-date"></p>
-            </div>
-            <div class="stats-header">
-                <div class="stat-circle">
-                    <svg viewBox="0 0 36 36" class="circular-chart">
-                        <path class="circle-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                        <path id="progress-circle" class="circle" stroke-dasharray="0, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                        <text x="18" y="20.35" class="percentage" id="percent-text">0%</text>
-                    </svg>
-                </div>
-            </div>
-        </header>
 
-        <section class="task-section">
-            <div class="section-header">
-                <h2>Today's Quests</h2>
-                <button onclick="togglePlanningMode()" class="btn-plan">Nightly Planning</button>
-            </div>
-            <div id="habit-list" class="habit-list">
-                </div>
-        </section>
-    </div>
+<header>🔥 Habit Tracker Pro</header>
 
-    <div id="planning-modal" class="modal">
-        <div class="modal-content">
-            <h3>Set Habits for Tomorrow</h3>
-            <div id="planning-options"></div>
-            <button onclick="saveNightlyPlan()" class="btn-save">Lock for Tomorrow</button>
-        </div>
-    </div>
+<div class="container">
 
-    <script src="script.js"></script>
+  <!-- Add Habit -->
+  <input id="habitInput" placeholder="Enter habit for tomorrow">
+  <button onclick="addHabit()">Add Habit</button>
+
+  <!-- Grid -->
+  <div class="grid">
+    <table id="habitTable"></table>
+  </div>
+
+  <!-- Stats -->
+  <div class="progress" id="progress"></div>
+  <div class="streak" id="streak"></div>
+
+</div>
+
+<script>
+
+// ===== DATA =====
+let habits = JSON.parse(localStorage.getItem("habits")) || [];
+let tracker = JSON.parse(localStorage.getItem("tracker")) || {};
+
+// ===== DATE =====
+let today = new Date();
+let year = today.getFullYear();
+let month = today.getMonth();
+
+// Get days in month
+let daysInMonth = new Date(year, month + 1, 0).getDate();
+
+// ===== SAVE =====
+function save(){
+  localStorage.setItem("habits", JSON.stringify(habits));
+  localStorage.setItem("tracker", JSON.stringify(tracker));
+}
+
+// ===== ADD HABIT =====
+function addHabit(){
+  let input = document.getElementById("habitInput");
+  if(input.value.trim() === "") return;
+
+  habits.push(input.value);
+  input.value = "";
+
+  save();
+  render();
+}
+
+// ===== TOGGLE =====
+function toggleHabit(habitIndex, day){
+  let key = `${year}-${month}-${day}`;
+
+  if(!tracker[key]) tracker[key] = [];
+
+  tracker[key][habitIndex] = !tracker[key][habitIndex];
+
+  save();
+  render();
+}
+
+// ===== CALCULATE PROGRESS =====
+function calculateToday(){
+  let key = `${year}-${month}-${today.getDate()}`;
+  let data = tracker[key] || [];
+
+  let done = data.filter(x => x).length;
+  let total = habits.length;
+
+  if(total === 0) return 0;
+
+  return Math.round((done / total) * 100);
+}
+
+// ===== STREAK =====
+function calculateStreak(){
+  let streak = 0;
+
+  for(let d = today.getDate(); d >= 1; d--){
+    let key = `${year}-${month}-${d}`;
+    let data = tracker[key] || [];
+
+    let done = data.filter(x => x).length;
+
+    if(done === habits.length && habits.length > 0){
+      streak++;
+    } else break;
+  }
+
+  return streak;
+}
+
+// ===== RENDER =====
+function render(){
+  let table = document.getElementById("habitTable");
+  table.innerHTML = "";
+
+  // Header
+  let header = "<tr><th>Habits</th>";
+  for(let d = 1; d <= daysInMonth; d++){
+    header += `<th>${d}</th>`;
+  }
+  header += "</tr>";
+  table.innerHTML += header;
+
+  // Rows
+  habits.forEach((habit, i)=>{
+    let row = `<tr><td class="habit-name">${habit}</td>`;
+
+    for(let d = 1; d <= daysInMonth; d++){
+      let key = `${year}-${month}-${d}`;
+      let checked = tracker[key]?.[i] ? "checked" : "";
+
+      row += `
+        <td>
+          <input type="checkbox" class="checkbox"
+          ${checked}
+          onclick="toggleHabit(${i}, ${d})">
+        </td>
+      `;
+    }
+
+    row += "</tr>";
+    table.innerHTML += row;
+  });
+
+  // Stats
+  document.getElementById("progress").innerText =
+    "Today Progress: " + calculateToday() + "%";
+
+  document.getElementById("streak").innerText =
+    "🔥 Streak: " + calculateStreak() + " days";
+}
+
+// ===== INIT =====
+render();
+
+</script>
+
 </body>
 </html>
-
-
-
 
 
 
