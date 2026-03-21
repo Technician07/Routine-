@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Habit Tracker Pro</title>
+<title>Habit Tracker Pro Max</title>
 
 <style>
 body{
@@ -13,37 +13,42 @@ body{
 }
 
 header{
+  background:#1e293b;
   padding:15px;
   text-align:center;
   font-size:22px;
   font-weight:bold;
-  background:#1e293b;
 }
 
 .container{
   padding:15px;
 }
 
-input, button{
+textarea{
+  width:100%;
+  height:100px;
+  border-radius:10px;
   padding:10px;
-  border:none;
-  border-radius:8px;
-  margin:5px;
-}
-
-input{
-  width:60%;
+  margin-top:10px;
 }
 
 button{
+  padding:10px 15px;
+  margin-top:10px;
+  border:none;
+  border-radius:8px;
   background:#22c55e;
   color:white;
   cursor:pointer;
 }
 
-.grid{
+.section{
   margin-top:20px;
+}
+
+.grid{
   overflow-x:auto;
+  margin-top:20px;
 }
 
 table{
@@ -63,7 +68,6 @@ th{
 
 .habit-name{
   text-align:left;
-  padding-left:10px;
 }
 
 .checkbox{
@@ -71,141 +75,172 @@ th{
   height:18px;
 }
 
-.progress{
-  margin-top:20px;
-  font-size:18px;
+.today-box{
+  background:#1e293b;
+  padding:10px;
+  border-radius:10px;
+  margin-top:10px;
 }
 
-.streak{
-  margin-top:10px;
-  font-size:16px;
-  color:#22c55e;
+.day-title{
+  font-size:18px;
+  margin-bottom:10px;
 }
+
 </style>
 
 </head>
 <body>
 
-<header>🔥 Habit Tracker Pro</header>
+<header>🔥 Habit Tracker Pro Max</header>
 
 <div class="container">
 
-  <!-- Add Habit -->
-  <input id="habitInput" placeholder="Enter habit for tomorrow">
-  <button onclick="addHabit()">Add Habit</button>
-
-  <!-- Grid -->
-  <div class="grid">
-    <table id="habitTable"></table>
+  <!-- INPUT -->
+  <div class="section">
+    <h3>Add Tomorrow Habits (one per line)</h3>
+    <textarea id="habitInput" placeholder="Gym&#10;Study&#10;Cricket&#10;Meditation"></textarea>
+    <button onclick="saveTomorrow()">Save Tomorrow List</button>
   </div>
 
-  <!-- Stats -->
-  <div class="progress" id="progress"></div>
-  <div class="streak" id="streak"></div>
+  <!-- TODAY -->
+  <div class="section">
+    <h3>Today's To-Do</h3>
+    <div id="todayList" class="today-box"></div>
+  </div>
+
+  <!-- GRID -->
+  <div class="grid">
+    <table id="table"></table>
+  </div>
 
 </div>
 
 <script>
 
-// ===== DATA =====
-let habits = JSON.parse(localStorage.getItem("habits")) || [];
-let tracker = JSON.parse(localStorage.getItem("tracker")) || {};
+// ===== STORAGE =====
+let data = JSON.parse(localStorage.getItem("habitData")) || {};
 
 // ===== DATE =====
-let today = new Date();
-let year = today.getFullYear();
-let month = today.getMonth();
+let now = new Date();
+let year = now.getFullYear();
+let month = now.getMonth();
+let todayDate = now.getDate();
 
-// Get days in month
-let daysInMonth = new Date(year, month + 1, 0).getDate();
+// ===== DAYS =====
+const days = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+let daysInMonth = new Date(year, month+1, 0).getDate();
 
 // ===== SAVE =====
 function save(){
-  localStorage.setItem("habits", JSON.stringify(habits));
-  localStorage.setItem("tracker", JSON.stringify(tracker));
+  localStorage.setItem("habitData", JSON.stringify(data));
 }
 
-// ===== ADD HABIT =====
-function addHabit(){
-  let input = document.getElementById("habitInput");
-  if(input.value.trim() === "") return;
+// ===== SAVE TOMORROW =====
+function saveTomorrow(){
+  let input = document.getElementById("habitInput").value.trim();
+  if(!input) return;
 
-  habits.push(input.value);
-  input.value = "";
+  let list = input.split("\n").slice(0,6); // max 6 habits
+
+  let tomorrow = new Date();
+  tomorrow.setDate(todayDate + 1);
+
+  let key = getKey(tomorrow);
+
+  data[key] = list.map(h => ({name:h, done:false}));
 
   save();
   render();
+}
+
+// ===== KEY =====
+function getKey(date){
+  return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+}
+
+// ===== AUTO SHIFT AFTER 12AM =====
+function checkNewDay(){
+  let last = localStorage.getItem("lastDate");
+
+  let todayKey = getKey(new Date());
+
+  if(last !== todayKey){
+    localStorage.setItem("lastDate", todayKey);
+    render();
+  }
 }
 
 // ===== TOGGLE =====
-function toggleHabit(habitIndex, day){
-  let key = `${year}-${month}-${day}`;
-
-  if(!tracker[key]) tracker[key] = [];
-
-  tracker[key][habitIndex] = !tracker[key][habitIndex];
-
+function toggle(dayKey, index){
+  data[dayKey][index].done = !data[dayKey][index].done;
   save();
   render();
 }
 
-// ===== CALCULATE PROGRESS =====
-function calculateToday(){
-  let key = `${year}-${month}-${today.getDate()}`;
-  let data = tracker[key] || [];
+// ===== TODAY LIST =====
+function renderToday(){
+  let box = document.getElementById("todayList");
+  box.innerHTML = "";
 
-  let done = data.filter(x => x).length;
-  let total = habits.length;
+  let key = getKey(new Date());
+  let todayData = data[key] || [];
 
-  if(total === 0) return 0;
+  let dayName = days[new Date().getDay()];
 
-  return Math.round((done / total) * 100);
+  box.innerHTML += `<div class="day-title">${dayName} (${todayDate})</div>`;
+
+  todayData.forEach((h, i)=>{
+    box.innerHTML += `
+      <div>
+        <input type="checkbox" ${h.done?"checked":""}
+        onclick="toggle('${key}', ${i})">
+        ${h.name}
+      </div>
+    `;
+  });
 }
 
-// ===== STREAK =====
-function calculateStreak(){
-  let streak = 0;
-
-  for(let d = today.getDate(); d >= 1; d--){
-    let key = `${year}-${month}-${d}`;
-    let data = tracker[key] || [];
-
-    let done = data.filter(x => x).length;
-
-    if(done === habits.length && habits.length > 0){
-      streak++;
-    } else break;
-  }
-
-  return streak;
-}
-
-// ===== RENDER =====
-function render(){
-  let table = document.getElementById("habitTable");
+// ===== GRID =====
+function renderGrid(){
+  let table = document.getElementById("table");
   table.innerHTML = "";
 
   // Header
   let header = "<tr><th>Habits</th>";
-  for(let d = 1; d <= daysInMonth; d++){
-    header += `<th>${d}</th>`;
+  for(let d=1; d<=daysInMonth; d++){
+    let date = new Date(year, month, d);
+    header += `<th>${days[date.getDay()]}<br>${d}</th>`;
   }
   header += "</tr>";
   table.innerHTML += header;
 
+  // Collect all habits (max structure)
+  let allHabits = [];
+
+  Object.values(data).forEach(day=>{
+    day.forEach(h=>{
+      if(!allHabits.includes(h.name)) allHabits.push(h.name);
+    });
+  });
+
   // Rows
-  habits.forEach((habit, i)=>{
+  allHabits.forEach(habit=>{
     let row = `<tr><td class="habit-name">${habit}</td>`;
 
-    for(let d = 1; d <= daysInMonth; d++){
+    for(let d=1; d<=daysInMonth; d++){
       let key = `${year}-${month}-${d}`;
-      let checked = tracker[key]?.[i] ? "checked" : "";
+      let dayData = data[key] || [];
+
+      let found = dayData.find(h=>h.name===habit);
+      let checked = found && found.done ? "checked" : "";
+
+      let index = dayData.findIndex(h=>h.name===habit);
 
       row += `
         <td>
-          <input type="checkbox" class="checkbox"
-          ${checked}
-          onclick="toggleHabit(${i}, ${d})">
+          ${found ? `<input type="checkbox" ${checked}
+          onclick="toggle('${key}', ${index})">` : ""}
         </td>
       `;
     }
@@ -213,22 +248,19 @@ function render(){
     row += "</tr>";
     table.innerHTML += row;
   });
+}
 
-  // Stats
-  document.getElementById("progress").innerText =
-    "Today Progress: " + calculateToday() + "%";
-
-  document.getElementById("streak").innerText =
-    "🔥 Streak: " + calculateStreak() + " days";
+// ===== RENDER =====
+function render(){
+  renderToday();
+  renderGrid();
 }
 
 // ===== INIT =====
+checkNewDay();
 render();
 
 </script>
 
 </body>
 </html>
-
-
-
