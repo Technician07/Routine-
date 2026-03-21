@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Habit Tracker Pro Max</title>
+<title>Habit Tracker Pro Elite</title>
 
 <style>
 body{
@@ -24,12 +24,22 @@ header{
   padding:15px;
 }
 
+.section{
+  margin-top:20px;
+}
+
+.box{
+  background:#1e293b;
+  padding:15px;
+  border-radius:10px;
+  margin-top:10px;
+}
+
 textarea{
   width:100%;
   height:100px;
   border-radius:10px;
   padding:10px;
-  margin-top:10px;
 }
 
 button{
@@ -40,10 +50,6 @@ button{
   background:#22c55e;
   color:white;
   cursor:pointer;
-}
-
-.section{
-  margin-top:20px;
 }
 
 .grid{
@@ -66,25 +72,13 @@ th{
   background:#1e293b;
 }
 
+.week{
+  background:#334155;
+  font-weight:bold;
+}
+
 .habit-name{
   text-align:left;
-}
-
-.checkbox{
-  width:18px;
-  height:18px;
-}
-
-.today-box{
-  background:#1e293b;
-  padding:10px;
-  border-radius:10px;
-  margin-top:10px;
-}
-
-.day-title{
-  font-size:18px;
-  margin-bottom:10px;
 }
 
 </style>
@@ -92,21 +86,22 @@ th{
 </head>
 <body>
 
-<header>🔥 Habit Tracker Pro Max</header>
+<header>🔥 Habit Tracker Elite</header>
 
 <div class="container">
 
-  <!-- INPUT -->
-  <div class="section">
-    <h3>Add Tomorrow Habits (one per line)</h3>
-    <textarea id="habitInput" placeholder="Gym&#10;Study&#10;Cricket&#10;Meditation"></textarea>
-    <button onclick="saveTomorrow()">Save Tomorrow List</button>
-  </div>
-
   <!-- TODAY -->
   <div class="section">
-    <h3>Today's To-Do</h3>
-    <div id="todayList" class="today-box"></div>
+    <h3>📅 Today</h3>
+    <div id="todayBox" class="box"></div>
+  </div>
+
+  <!-- TOMORROW -->
+  <div class="section">
+    <h3>⏭ Tomorrow</h3>
+    <textarea id="tomorrowInput" placeholder="Write habits (one per line)"></textarea>
+    <button onclick="saveTomorrow()">Save Tomorrow</button>
+    <div id="tomorrowBox" class="box"></div>
   </div>
 
   <!-- GRID -->
@@ -118,104 +113,94 @@ th{
 
 <script>
 
-// ===== STORAGE =====
 let data = JSON.parse(localStorage.getItem("habitData")) || {};
+let tomorrowData = JSON.parse(localStorage.getItem("tomorrowData")) || [];
 
-// ===== DATE =====
 let now = new Date();
 let year = now.getFullYear();
 let month = now.getMonth();
-let todayDate = now.getDate();
+let today = now.getDate();
 
-// ===== DAYS =====
-const days = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+let days = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
 let daysInMonth = new Date(year, month+1, 0).getDate();
 
-// ===== SAVE =====
-function save(){
-  localStorage.setItem("habitData", JSON.stringify(data));
-}
-
-// ===== SAVE TOMORROW =====
-function saveTomorrow(){
-  let input = document.getElementById("habitInput").value.trim();
-  if(!input) return;
-
-  let list = input.split("\n").slice(0,6); // max 6 habits
-
-  let tomorrow = new Date();
-  tomorrow.setDate(todayDate + 1);
-
-  let key = getKey(tomorrow);
-
-  data[key] = list.map(h => ({name:h, done:false}));
-
-  save();
-  render();
-}
-
-// ===== KEY =====
 function getKey(date){
   return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
 }
 
-// ===== AUTO SHIFT AFTER 12AM =====
-function checkNewDay(){
-  let last = localStorage.getItem("lastDate");
-
-  let todayKey = getKey(new Date());
-
-  if(last !== todayKey){
-    localStorage.setItem("lastDate", todayKey);
-    render();
-  }
+function save(){
+  localStorage.setItem("habitData", JSON.stringify(data));
+  localStorage.setItem("tomorrowData", JSON.stringify(tomorrowData));
 }
 
-// ===== TOGGLE =====
-function toggle(dayKey, index){
-  data[dayKey][index].done = !data[dayKey][index].done;
+// ===== SAVE TOMORROW =====
+function saveTomorrow(){
+  let input = document.getElementById("tomorrowInput").value.trim();
+  if(!input) return;
+
+  tomorrowData = input.split("\n").slice(0,6).map(h=>({name:h, done:false}));
+
   save();
   render();
 }
 
-// ===== TODAY LIST =====
+// ===== AUTO MOVE AFTER 12AM =====
+function autoMove(){
+  let lastDate = localStorage.getItem("lastDate");
+  let todayKey = getKey(new Date());
+
+  if(lastDate !== todayKey){
+    localStorage.setItem("lastDate", todayKey);
+
+    if(tomorrowData.length){
+      data[todayKey] = tomorrowData;
+      tomorrowData = [];
+      save();
+    }
+  }
+}
+
+// ===== TOGGLE =====
+function toggle(key, index){
+  data[key][index].done = !data[key][index].done;
+  save();
+  render();
+}
+
+// ===== TODAY BOX =====
 function renderToday(){
-  let box = document.getElementById("todayList");
+  let box = document.getElementById("todayBox");
   box.innerHTML = "";
 
   let key = getKey(new Date());
-  let todayData = data[key] || [];
+  let todayList = data[key] || [];
 
-  let dayName = days[new Date().getDay()];
-
-  box.innerHTML += `<div class="day-title">${dayName} (${todayDate})</div>`;
-
-  todayData.forEach((h, i)=>{
+  todayList.forEach((h,i)=>{
     box.innerHTML += `
       <div>
         <input type="checkbox" ${h.done?"checked":""}
-        onclick="toggle('${key}', ${i})">
+        onclick="toggle('${key}',${i})">
         ${h.name}
       </div>
     `;
   });
 }
 
-// ===== GRID =====
+// ===== TOMORROW BOX =====
+function renderTomorrow(){
+  let box = document.getElementById("tomorrowBox");
+  box.innerHTML = "";
+
+  tomorrowData.forEach(h=>{
+    box.innerHTML += `<div>${h.name}</div>`;
+  });
+}
+
+// ===== GRID WITH WEEKS =====
 function renderGrid(){
   let table = document.getElementById("table");
   table.innerHTML = "";
 
-  // Header
-  let header = "<tr><th>Habits</th>";
-  for(let d=1; d<=daysInMonth; d++){
-    let date = new Date(year, month, d);
-    header += `<th>${days[date.getDay()]}<br>${d}</th>`;
-  }
-  header += "</tr>";
-  table.innerHTML += header;
-
-  // Collect all habits (max structure)
   let allHabits = [];
 
   Object.values(data).forEach(day=>{
@@ -223,6 +208,24 @@ function renderGrid(){
       if(!allHabits.includes(h.name)) allHabits.push(h.name);
     });
   });
+
+  // Header with weeks
+  let header = "<tr><th>Habits</th>";
+
+  for(let d=1; d<=daysInMonth; d++){
+    if(d % 7 === 1){
+      header += `<th class="week" colspan="7">Week ${Math.ceil(d/7)}</th>`;
+    }
+  }
+  header += "</tr><tr><th></th>";
+
+  for(let d=1; d<=daysInMonth; d++){
+    let date = new Date(year, month, d);
+    header += `<th>${days[date.getDay()]}<br>${d}</th>`;
+  }
+  header += "</tr>";
+
+  table.innerHTML += header;
 
   // Rows
   allHabits.forEach(habit=>{
@@ -234,13 +237,12 @@ function renderGrid(){
 
       let found = dayData.find(h=>h.name===habit);
       let checked = found && found.done ? "checked" : "";
-
       let index = dayData.findIndex(h=>h.name===habit);
 
       row += `
         <td>
           ${found ? `<input type="checkbox" ${checked}
-          onclick="toggle('${key}', ${index})">` : ""}
+          onclick="toggle('${key}',${index})">` : ""}
         </td>
       `;
     }
@@ -253,14 +255,20 @@ function renderGrid(){
 // ===== RENDER =====
 function render(){
   renderToday();
+  renderTomorrow();
   renderGrid();
 }
 
 // ===== INIT =====
-checkNewDay();
+autoMove();
 render();
 
 </script>
 
 </body>
 </html>
+
+
+
+
+  
